@@ -14,7 +14,7 @@ class Transaction implements Serializable {
     private String description;
     private double amount;
 
-    public Transaction(String date, String type, String category, String description, double amount) {
+    public Transaction(String date, String type, String category, String description, double amount){
         this.date = date;
         this.type = type;
         this.category = category;
@@ -22,22 +22,41 @@ class Transaction implements Serializable {
         this.amount = amount;
     }
 
-    public String getDate() { return date; }
-    public String getType() { return type; }
-    public String getCategory() { return category; }
-    public String getDescription() { return description; }
-    public double getAmount() { return amount; }
+    public String getDate(){ 
+return date; 
+}
+    public String getType(){ 
+return type; 
+}
+    public String getCategory(){ 
+return category; 
+}
+    public String getDescription(){ 
+return description; 
+}
+    public double getAmount(){ 
+return amount; 
+}
 
-    public void setDate(String date) { this.date = date; }
-    public void setType(String type) { this.type = type; }
-    public void setCategory(String category) { this.category = category; }
-    public void setDescription(String description) { this.description = description; }
-    public void setAmount(double amount) { this.amount = amount; }
+    public void setDate(String date){ 
+this.date = date; 
+}
+    public void setType(String type){ 
+this.type = type; 
+}
+    public void setCategory(String category){ 
+this.category = category; 
+}
+    public void setDescription(String description){ 
+this.description = description;
+}
+    public void setAmount(double amount){ 
+this.amount = amount;
+}
 
     @Override
-    public String toString() {
-        return String.format("%-12s %-8s %-15s %-20s $%.2f",
-                date, type, category, description, amount);
+    public String toString(){
+        return String.format("%-12s %-8s %-15s %-20s $%.2f", date, type, category, description, amount);
     }
 }
 
@@ -73,28 +92,28 @@ class TransactionManager{
         return false;
     }
 
-    public ArrayList<Transaction> getTransactions() {
+    public ArrayList<Transaction> getTransactions(){
         return new ArrayList<>(transactions);
     }
 
-    private void saveToFile() {
+    private void saveToFile(){
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
             oos.writeObject(transactions);
         }
-        catch (IOException e) {
+        catch (IOException e){
             JOptionPane.showMessageDialog(null, "Error saving transactions: " + e.getMessage());
         }
     }
 
     @SuppressWarnings("unchecked")
-    private void loadFromFile() {
+    private void loadFromFile(){
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(DATA_FILE))) {
             transactions = (ArrayList<Transaction>) ois.readObject();
         }
-        catch (FileNotFoundException e) {
+        catch (FileNotFoundException e){
             transactions = new ArrayList<>();
         }
-        catch (IOException | ClassNotFoundException e) {
+        catch (IOException | ClassNotFoundException e){
             JOptionPane.showMessageDialog(null, "Error loading transactions: " + e.getMessage());
             transactions = new ArrayList<>();
         }
@@ -133,7 +152,7 @@ public class PersonalFinanceTracker{
         initializeGUI();
     }
 
-    private void initializeGUI() {
+    private void initializeGUI(){
         frame = new JFrame("Personal Finance Tracker");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1200, 600);
@@ -211,7 +230,7 @@ public class PersonalFinanceTracker{
         JButton pieChartButton = createStyledButton("Show Pie Chart");
         barChartButton.addActionListener(new ActionListener(){
             @Override
-            public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent e){
                 chartGenerator.showBarChart();
             }
         });
@@ -224,14 +243,15 @@ public class PersonalFinanceTracker{
         buttonPanel.add(barChartButton);
         buttonPanel.add(pieChartButton);
     }
-    private JButton createStyledButton(String text) {
+
+    private JButton createStyledButton(String text){
         JButton button = new JButton(text);
         button.setFont(georgia);
         button.setBackground(Color.WHITE);
         button.setForeground(softPinkText);
         return button;
     }
-    private JLabel createStyledLabel(String text) {
+    private JLabel createStyledLabel(String text){
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(georgia);
         label.setForeground(softPinkText);
@@ -252,7 +272,7 @@ public class PersonalFinanceTracker{
         }
     }
 
-    private void updateSummaryLabels(JLabel incomeLabel, JLabel expenseLabel, JLabel balanceLabel) {
+    private void updateSummaryLabels(JLabel incomeLabel, JLabel expenseLabel, JLabel balanceLabel){
         incomeLabel.setText(String.format("Total Income: $%.2f", manager.getTotalIncome()));
         expenseLabel.setText(String.format("Total Expenses: $%.2f", manager.getTotalExpenses()));
         balanceLabel.setText(String.format("Balance: $%.2f", manager.getBalance()));
@@ -284,7 +304,7 @@ public class PersonalFinanceTracker{
         JButton saveButton = createStyledButton("Save");
         JButton cancelButton = createStyledButton("Cancel");
 
-        saveButton.addActionListener(e -> {
+        saveButton.addActionListener(e ->{
             try {
                 LocalDate.parse(dateField.getText());
                 double amount = Double.parseDouble(amountField.getText());
@@ -420,7 +440,7 @@ public class PersonalFinanceTracker{
         }
     }
 
-    private void generateReport() {
+    private void generateReport(){
         StringBuilder report = new StringBuilder();
         report.append("Personal Finance Report\n");
         report.append("-----------------------\n\n");
@@ -429,7 +449,7 @@ public class PersonalFinanceTracker{
         report.append(String.format("Balance: $%.2f\n\n", manager.getBalance()));
 
         report.append("Transaction History:\n");
-        for (Transaction t : manager.getTransactions()) {
+        for (Transaction t : manager.getTransactions()){
             report.append(t.toString()).append("\n");
         }
 
@@ -442,16 +462,16 @@ public class PersonalFinanceTracker{
         JOptionPane.showMessageDialog(frame, scrollPane, "Financial Report", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private class TransactionListRenderer extends DefaultListCellRenderer {
+    private class TransactionListRenderer extends DefaultListCellRenderer{
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                      boolean isSelected, boolean cellHasFocus) {
+                                                      boolean isSelected, boolean cellHasFocus){
             super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
             setFont(georgia);
-            if (value instanceof Transaction) {
+            if (value instanceof Transaction){
                 Transaction t = (Transaction) value;
                 setText(t.toString());
-                if (t.getType().equals("Expense")) {
+                if (t.getType().equals("Expense")){
                     setForeground(new Color(128, 0, 128));
                 } else {
                     setForeground(new Color(172, 120, 186));
@@ -469,7 +489,7 @@ public class PersonalFinanceTracker{
             this.manager = manager;
         }
 
-        public void showBarChart() {
+        public void showBarChart(){
             JFrame frame = new JFrame("Bar Chart: Income, Expenses, Balance");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(500, 400);
@@ -478,7 +498,7 @@ public class PersonalFinanceTracker{
             frame.setVisible(true);
         }
 
-        public void showPieChart() {
+        public void showPieChart(){
             JFrame frame = new JFrame("Pie Chart: Income vs Expenses");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(500, 400);
@@ -487,10 +507,10 @@ public class PersonalFinanceTracker{
             frame.setVisible(true);
         }
     }
-    class BarChartPanel extends JPanel {
+    class BarChartPanel extends JPanel{
         private TransactionManager manager;
 
-        public BarChartPanel(TransactionManager manager) {
+        public BarChartPanel(TransactionManager manager){
             this.manager = manager;
         }
 
@@ -552,7 +572,7 @@ public class PersonalFinanceTracker{
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args){
         SwingUtilities.invokeLater(PersonalFinanceTracker::new);
     }
 }
