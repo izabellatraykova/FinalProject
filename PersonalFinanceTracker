@@ -1,116 +1,558 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
 import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
-class Transaction{
+class Transaction implements Serializable {
     private String date;
     private String type;
+    private String category;
     private String description;
     private double amount;
 
-    public Transaction(String date, String type, String description, double amount){
+    public Transaction(String date, String type, String category, String description, double amount) {
         this.date = date;
         this.type = type;
+        this.category = category;
         this.description = description;
         this.amount = amount;
     }
 
-    public String getDate(){
-        return date;
-    }
+    public String getDate() { return date; }
+    public String getType() { return type; }
+    public String getCategory() { return category; }
+    public String getDescription() { return description; }
+    public double getAmount() { return amount; }
 
-    public void setDate(String date){
-        this.date = date;
-    }
-
-    public String getType(){
-        return type;
-    }
-
-    public void setType(String type){
-        this.type = type;
-    }
-
-    public String getDescription(){
-        return description;
-    }
-
-    public void setDescription(String description){
-        this.description = description;
-    }
-
-    public double getAmount(){
-        return amount;
-    }
-
-    public void setAmount(double amount){
-        this.amount = amount;
-    }
+    public void setDate(String date) { this.date = date; }
+    public void setType(String type) { this.type = type; }
+    public void setCategory(String category) { this.category = category; }
+    public void setDescription(String description) { this.description = description; }
+    public void setAmount(double amount) { this.amount = amount; }
 
     @Override
-    public String toString(){
-        return date + " | " + type + " | " + description + " | $" + amount;
+    public String toString() {
+        return String.format("%-12s %-8s %-15s %-20s $%.2f",
+                date, type, category, description, amount);
     }
 }
 
 class TransactionManager{
     private ArrayList<Transaction> transactions;
+    private static final String DATA_FILE = "transactions.dat";
 
     public TransactionManager(){
         transactions = new ArrayList<>();
+        loadFromFile();
     }
 
     public void addTransaction(Transaction t){
         transactions.add(t);
-        // To-do: add file saving logic
+        saveToFile();
+    }
+
+    public boolean updateTransaction(int index, Transaction newTransaction){
+        if (index >= 0 && index < transactions.size()){
+            transactions.set(index, newTransaction);
+            saveToFile();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean deleteTransaction(int index){
+        if (index >= 0 && index < transactions.size()){
+            transactions.remove(index);
+            saveToFile();
+            return true;
+        }
+        return false;
     }
 
     public ArrayList<Transaction> getTransactions() {
-        return transactions;
+        return new ArrayList<>(transactions);
     }
 
-        // To-do: Add update, delete, loadFromFile(), saveToFile())
+    private void saveToFile() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+            oos.writeObject(transactions);
+        }
+        catch (IOException e) {
+            JOptionPane.showMessageDialog(null, "Error saving transactions: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadFromFile() {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(DATA_FILE))) {
+            transactions = (ArrayList<Transaction>) ois.readObject();
+        }
+        catch (FileNotFoundException e) {
+            transactions = new ArrayList<>();
+        }
+        catch (IOException | ClassNotFoundException e) {
+            JOptionPane.showMessageDialog(null, "Error loading transactions: " + e.getMessage());
+            transactions = new ArrayList<>();
+        }
+    }
+
+    public double getTotalIncome(){
+        return transactions.stream()
+                .filter(t -> t.getType().equalsIgnoreCase("Income"))
+                .mapToDouble(Transaction::getAmount)
+                .sum();
+    }
+
+    public double getTotalExpenses(){
+        return transactions.stream()
+                .filter(t -> t.getType().equalsIgnoreCase("Expense"))
+                .mapToDouble(Transaction::getAmount)
+                .sum();
+    }
+
+    public double getBalance(){
+        return getTotalIncome() - getTotalExpenses();
+    }
 }
 
 public class PersonalFinanceTracker{
     private JFrame frame;
     private TransactionManager manager;
+    private DefaultListModel<Transaction> listModel;
+    private JList<Transaction> transactionList;
+    private final Color babyPink = new Color(255, 228, 235);
+    private final Color softPinkText = new Color(255, 105, 180);
+    private final Font georgia = new Font("Georgia", Font.BOLD, 14);
 
     public PersonalFinanceTracker(){
         manager = new TransactionManager();
+        initializeGUI();
+    }
+
+    private void initializeGUI() {
         frame = new JFrame("Personal Finance Tracker");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(500, 500);
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(4, 3));
+        frame.setSize(1200, 600);
+        frame.setLayout(new BorderLayout());
+        frame.getContentPane().setBackground(babyPink);
 
-        JButton addButton = new JButton("Add Transaction");
-        JButton viewButton = new JButton("View Transactions");
-        JButton reportButton = new JButton("Generate Monthly Report");
-        JButton exitButton = new JButton("Exit");
+        JMenuBar menuBar = new JMenuBar();
+        menuBar.setBackground(babyPink);
+        menuBar.setFont(georgia);
+        JMenu fileMenu = new JMenu("Personal Finance Tracker");
+        fileMenu.setFont(georgia);
+        menuBar.add(fileMenu);
+        frame.setJMenuBar(menuBar);
 
-        panel.add(addButton);
-        panel.add(viewButton);
-        panel.add(reportButton);
-        panel.add(exitButton);
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 4));
+        buttonPanel.setBackground(babyPink);
+        JButton addButton = createStyledButton("Add Transaction");
+        JButton editButton = createStyledButton("Edit Transaction");
+        JButton deleteButton = createStyledButton("Delete Transaction");
+        JButton reportButton = createStyledButton("Generate Report");
 
-        // To-do: Add buttons
+        addButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                showAddTransactionDialog();
+            }
+        });
+        editButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                editSelectedTransaction();
+            }
+        });
+        deleteButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                deleteSelectedTransaction();
+            }
+        });
+        reportButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                generateReport();
+            }
+        });
 
-        frame.getContentPane().add(panel);
+        buttonPanel.add(addButton);
+        buttonPanel.add(editButton);
+        buttonPanel.add(deleteButton);
+        buttonPanel.add(reportButton);
+
+        listModel = new DefaultListModel<>();
+        updateTransactionList();
+        transactionList = new JList<>(listModel);
+        transactionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        transactionList.setCellRenderer(new TransactionListRenderer());
+        transactionList.setBackground(Color.WHITE);
+        transactionList.setFont(georgia);
+        JScrollPane scrollPane = new JScrollPane(transactionList);
+        JPanel summaryPanel = new JPanel(new GridLayout(1, 3));
+        summaryPanel.setBackground(babyPink);
+        JLabel incomeLabel = createStyledLabel("Total Income: $0.00");
+        JLabel expenseLabel = createStyledLabel("Total Expenses: $0.00");
+        JLabel balanceLabel = createStyledLabel("Balance: $0.00");
+        summaryPanel.add(incomeLabel);
+        summaryPanel.add(expenseLabel);
+        summaryPanel.add(balanceLabel);
+        updateSummaryLabels(incomeLabel, expenseLabel, balanceLabel);
+        frame.add(buttonPanel, BorderLayout.NORTH);
+        frame.add(scrollPane, BorderLayout.CENTER);
+        frame.add(summaryPanel, BorderLayout.SOUTH);
         frame.setVisible(true);
+        ChartGenerator chartGenerator = new ChartGenerator(manager);
+        JButton barChartButton = createStyledButton("Show Bar Chart");
+        JButton pieChartButton = createStyledButton("Show Pie Chart");
+        barChartButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                chartGenerator.showBarChart();
+            }
+        });
+        pieChartButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                chartGenerator.showPieChart();
+            }
+        });
+        buttonPanel.add(barChartButton);
+        buttonPanel.add(pieChartButton);
+    }
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(georgia);
+        button.setBackground(Color.WHITE);
+        button.setForeground(softPinkText);
+        return button;
+    }
+    private JLabel createStyledLabel(String text) {
+        JLabel label = new JLabel(text, SwingConstants.CENTER);
+        label.setFont(georgia);
+        label.setForeground(softPinkText);
+        return label;
+    }
+    private JTextField createStyledTextField(String defaultText){
+        JTextField field = new JTextField(defaultText);
+        field.setFont(georgia);
+        field.setBackground(Color.WHITE);
+        field.setForeground(softPinkText);
+        return field;
+    }
 
-        // To-do: Finish GUI
+    private void updateTransactionList(){
+        listModel.clear();
+        for (Transaction t : manager.getTransactions()){
+            listModel.addElement(t);
+        }
+    }
+
+    private void updateSummaryLabels(JLabel incomeLabel, JLabel expenseLabel, JLabel balanceLabel) {
+        incomeLabel.setText(String.format("Total Income: $%.2f", manager.getTotalIncome()));
+        expenseLabel.setText(String.format("Total Expenses: $%.2f", manager.getTotalExpenses()));
+        balanceLabel.setText(String.format("Balance: $%.2f", manager.getBalance()));
     }
 
     private void showAddTransactionDialog(){
-        JTextField dateField = new JTextField();
-        JTextField typeField = new JTextField();
-        JTextField descriptionField = new JTextField();
-        JTextField amountField = new JTextField();
+        JDialog dialog = new JDialog(frame, "Add New Transaction", true);
+        dialog.setLayout(new GridLayout(6, 2));
+        dialog.getContentPane().setBackground(babyPink);
+
+        JTextField dateField = createStyledTextField(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"Income", "Expense"});
+        typeCombo.setFont(georgia);
+        JTextField categoryField = createStyledTextField("");
+        JTextField descriptionField = createStyledTextField("");
+        JTextField amountField = createStyledTextField("");
+
+        dialog.add(new JLabel("Date (YYYY-MM-DD):")).setFont(georgia);
+        dialog.add(dateField);
+        dialog.add(new JLabel("Type:")).setFont(georgia);
+        dialog.add(typeCombo);
+        dialog.add(new JLabel("Category:")).setFont(georgia);
+        dialog.add(categoryField);
+        dialog.add(new JLabel("Description:")).setFont(georgia);
+        dialog.add(descriptionField);
+        dialog.add(new JLabel("Amount:")).setFont(georgia);
+        dialog.add(amountField);
+
+        JButton saveButton = createStyledButton("Save");
+        JButton cancelButton = createStyledButton("Cancel");
+
+        saveButton.addActionListener(e -> {
+            try {
+                LocalDate.parse(dateField.getText());
+                double amount = Double.parseDouble(amountField.getText());
+                if (amount <= 0) throw new NumberFormatException("Amount must be positive");
+
+                Transaction t = new Transaction(
+                        dateField.getText(),
+                        (String) typeCombo.getSelectedItem(),
+                        categoryField.getText(),
+                        descriptionField.getText(),
+                        amount
+                );
+                manager.addTransaction(t);
+                updateTransactionList();
+                dialog.dispose();
+            } catch (DateTimeParseException ex){
+                JOptionPane.showMessageDialog(dialog, "Invalid date format. Please use YYYY-MM-DD");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Invalid amount: " + ex.getMessage());
+            }
+        });
+
+        cancelButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                dialog.dispose();
+            }
+        });
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(babyPink);
+        buttonPanel.add(saveButton);
+        buttonPanel.add(cancelButton);
+        dialog.add(new JLabel());
+        dialog.add(buttonPanel);
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(frame);
+        dialog.setVisible(true);
     }
 
-        //To-do: create showTransactionList method
+    private void editSelectedTransaction(){
+        int selectedIndex = transactionList.getSelectedIndex();
+        if (selectedIndex == -1) {
+            JOptionPane.showMessageDialog(frame, "Please select a transaction to edit");
+            return;
+        }
 
-    public static void main(String[] args){
-        SwingUtilities.invokeLater(() -> new PersonalFinanceTracker());
+        Transaction selected = listModel.getElementAt(selectedIndex);
+        JDialog dialog = new JDialog(frame, "Edit Transaction", true);
+        dialog.setLayout(new GridLayout(6, 2));
+        dialog.getContentPane().setBackground(babyPink);
+
+        JTextField dateField = createStyledTextField(selected.getDate());
+        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"Income", "Expense"});
+        typeCombo.setFont(georgia);
+        typeCombo.setSelectedItem(selected.getType());
+        JTextField categoryField = createStyledTextField(selected.getCategory());
+        JTextField descriptionField = createStyledTextField(selected.getDescription());
+        JTextField amountField = createStyledTextField(String.valueOf(selected.getAmount()));
+
+        dialog.add(new JLabel("Date (YYYY-MM-DD):")).setFont(georgia);
+        dialog.add(dateField);
+        dialog.add(new JLabel("Type:")).setFont(georgia);
+        dialog.add(typeCombo);
+        dialog.add(new JLabel("Category:")).setFont(georgia);
+        dialog.add(categoryField);
+        dialog.add(new JLabel("Description:")).setFont(georgia);
+        dialog.add(descriptionField);
+        dialog.add(new JLabel("Amount:")).setFont(georgia);
+        dialog.add(amountField);
+
+        JButton saveButton = createStyledButton("Save");
+        JButton cancelButton = createStyledButton("Cancel");
+
+        saveButton.addActionListener(e ->{
+            try {
+                LocalDate.parse(dateField.getText());
+                double amount = Double.parseDouble(amountField.getText());
+                if (amount <= 0) throw new NumberFormatException("Amount must be positive");
+
+                Transaction updated = new Transaction(
+                        dateField.getText(),
+                        (String) typeCombo.getSelectedItem(),
+                        categoryField.getText(),
+                        descriptionField.getText(),
+                        amount
+                );
+                if (manager.updateTransaction(selectedIndex, updated)){
+                    updateTransactionList();
+                    dialog.dispose();
+                }
+            } catch (DateTimeParseException ex){
+                JOptionPane.showMessageDialog(dialog, "Invalid date format. Please use YYYY-MM-DD");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Invalid amount: " + ex.getMessage());
+            }
+        });
+        cancelButton.addActionListener(new ActionListener(){
+            @Override
+            public void actionPerformed(ActionEvent e){
+                dialog.dispose();
+            }
+        });
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(babyPink);
+        buttonPanel.add(saveButton);
+        buttonPanel.add(cancelButton);
+        dialog.add(new JLabel());
+        dialog.add(buttonPanel);
+        dialog.pack();
+        dialog.setLocationRelativeTo(frame);
+        dialog.setVisible(true);
     }
+
+    private void deleteSelectedTransaction(){
+        int selectedIndex = transactionList.getSelectedIndex();
+        if (selectedIndex == -1){
+            JOptionPane.showMessageDialog(frame, "Please select a transaction to delete");
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(
+                frame,
+                "Are you sure you want to delete this transaction?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (confirm == JOptionPane.YES_OPTION){
+            if (manager.deleteTransaction(selectedIndex)){
+                updateTransactionList();
+            }
+        }
+    }
+
+    private void generateReport() {
+        StringBuilder report = new StringBuilder();
+        report.append("Personal Finance Report\n");
+        report.append("-----------------------\n\n");
+        report.append(String.format("Total Income: $%.2f\n", manager.getTotalIncome()));
+        report.append(String.format("Total Expenses: $%.2f\n", manager.getTotalExpenses()));
+        report.append(String.format("Balance: $%.2f\n\n", manager.getBalance()));
+
+        report.append("Transaction History:\n");
+        for (Transaction t : manager.getTransactions()) {
+            report.append(t.toString()).append("\n");
+        }
+
+        JTextArea textArea = new JTextArea(report.toString());
+        textArea.setEditable(false);
+        textArea.setFont(georgia);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(600, 400));
+
+        JOptionPane.showMessageDialog(frame, scrollPane, "Financial Report", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private class TransactionListRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                      boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            setFont(georgia);
+            if (value instanceof Transaction) {
+                Transaction t = (Transaction) value;
+                setText(t.toString());
+                if (t.getType().equals("Expense")) {
+                    setForeground(new Color(128, 0, 128));
+                } else {
+                    setForeground(new Color(172, 120, 186));
+                }
+            }
+            return this;
+        }
+    }
+
+    public class ChartGenerator{
+
+        private TransactionManager manager;
+
+        public ChartGenerator(TransactionManager manager) {
+            this.manager = manager;
+        }
+
+        public void showBarChart() {
+            JFrame frame = new JFrame("Bar Chart: Income, Expenses, Balance");
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.setSize(500, 400);
+            frame.add(new BarChartPanel(manager));
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+        }
+
+        public void showPieChart() {
+            JFrame frame = new JFrame("Pie Chart: Income vs Expenses");
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.setSize(500, 400);
+            frame.add(new PieChartPanel(manager));
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+        }
+    }
+    class BarChartPanel extends JPanel {
+        private TransactionManager manager;
+
+        public BarChartPanel(TransactionManager manager) {
+            this.manager = manager;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g){
+            super.paintComponent(g);
+            double income = manager.getTotalIncome();
+            double expenses = manager.getTotalExpenses();
+            double balance = manager.getBalance();
+            double max = Math.max(income, Math.max(expenses, balance));
+            int barWidth = 100;
+            int spacing = 50;
+            int baseY = getHeight() - 50;
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setFont(new Font("Georgia", Font.BOLD, 14));
+            drawBar(g2, "Income", income, 50, baseY, barWidth, max, new Color(172, 120, 186));
+            drawBar(g2, "Expenses", expenses, 50 + barWidth + spacing, baseY, barWidth, max, new Color(128, 0, 128));
+            drawBar(g2, "Balance", balance, 50 + 2 * (barWidth + spacing), baseY, barWidth, max, new Color(255, 228, 235));
+        }
+
+        private void drawBar(Graphics2D g2, String label, double value, int x, int baseY, int width, double max, Color color){
+            int height = (int) ((value / max) * 200);
+            g2.setColor(color);
+            g2.fillRect(x, baseY - height, width, height);
+            g2.setColor(new Color(255, 105, 180));
+            g2.drawRect(x, baseY - height, width, height);
+            g2.drawString(label, x + 10, baseY + 20);
+            g2.drawString(String.format("$%.2f", value), x + 10, baseY - height - 5);
+        }
+    }
+    class PieChartPanel extends JPanel{
+        private TransactionManager manager;
+
+        public PieChartPanel(TransactionManager manager){
+            this.manager = manager;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g){
+            super.paintComponent(g);
+            double income = manager.getTotalIncome();
+            double expenses = manager.getTotalExpenses();
+            double total = income + expenses;
+            if (total == 0) return;
+            int startAngle = 0;
+            int x = 100, y = 50, width = 250, height = 250;
+            int incomeAngle = (int) (income / total * 360);
+            int expensesAngle = 360 - incomeAngle;
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setColor(new Color(172, 120, 186));
+            g2.fillArc(x, y, width, height, startAngle, incomeAngle);
+            startAngle += incomeAngle;
+            g2.setColor(new Color(128, 0, 128));
+            g2.fillArc(x, y, width, height, startAngle, expensesAngle);
+            g2.setFont(new Font("Georgia", Font.BOLD, 14));
+            g2.setColor(new Color(255, 105, 180));
+            g2.drawString("Income: $" + String.format("%.2f", income), 100, 330);
+            g2.drawString("Expenses: $" + String.format("%.2f", expenses), 100, 350);
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(PersonalFinanceTracker::new);
+    }
+}
